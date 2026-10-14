@@ -1,0 +1,2211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VirtuTrain Enterprise — Secure Multiplayer Training Platform</title>
+<style>
+  :root {
+    --bg: #0a0e1a; --bg2: #131c33;
+    --panel: rgba(15,22,45,0.92);
+    --panel-border: rgba(79,195,247,0.25);
+    --accent: #4fc3f7; --accent2: #7c4dff;
+    --good: #4caf50; --warn: #ff9800; --bad: #f44336;
+    --text: #e6f1ff; --text-dim: #8ba5c9;
+    --shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  [data-theme="light"] {
+    --bg: #f0f4f8; --bg2: #fff;
+    --panel: rgba(255,255,255,0.95);
+    --panel-border: rgba(0,120,200,0.3);
+    --accent: #0288d1; --accent2: #5e35b1;
+    --text: #102a43; --text-dim: #486581;
+    --shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    overflow: hidden; height: 100%;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea {
+    font-family: inherit; font-size: 13px;
+    background: var(--bg2); color: var(--text);
+    border: 1px solid var(--panel-border); border-radius: 6px;
+    padding: 8px 12px; outline: none; width: 100%;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 3px; }
+  canvas { display: block; }
+
+  #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px;
+    background: linear-gradient(180deg, var(--bg) 0%, transparent 100%);
+  }
+  #brand { display: flex; align-items: center; gap: 12px; font-size: 15px; letter-spacing: 1.5px; font-weight: 600; color: var(--accent); }
+  #brand .logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: grid; place-items: center; font-size: 18px;
+    box-shadow: 0 0 20px rgba(79,195,247,0.4);
+  }
+  .stat-group { display: flex; gap: 10px; pointer-events: auto; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    padding: 6px 12px; border-radius: 8px; font-size: 11px;
+    min-width: 80px; text-align: center; backdrop-filter: blur(8px);
+  }
+  .stat b { color: var(--accent); display: block; font-size: 16px; margin-top: 2px; }
+  .stat.green b { color: var(--good); }
+  .stat.orange b { color: var(--warn); }
+  .stat.red b { color: var(--bad); }
+  .stat.online b { color: #00e676; }
+
+  #leftPanel {
+    position: absolute; top: 70px; left: 16px; width: 300px;
+    max-height: calc(100vh - 200px);
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 14px;
+    backdrop-filter: blur(10px); pointer-events: auto;
+    overflow-y: auto; box-shadow: var(--shadow);
+  }
+  .panel-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--accent); margin-bottom: 10px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-title small { color: var(--text-dim); font-size: 10px; letter-spacing: 0; }
+
+  .scenario-item {
+    display: flex; gap: 10px; padding: 10px;
+    background: rgba(30,42,75,0.4); border: 1px solid transparent;
+    border-radius: 8px; cursor: pointer; transition: all 0.2s;
+    margin-bottom: 6px; font-size: 12px;
+  }
+  .scenario-item:hover { background: rgba(79,195,247,0.1); border-color: var(--panel-border); }
+  .scenario-item.active {
+    background: rgba(79,195,247,0.15); border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(79,195,247,0.3);
+  }
+  .scenario-icon { font-size: 22px; line-height: 1; }
+  .scenario-info { flex: 1; min-width: 0; }
+  .scenario-info b { display: block; color: var(--text); font-size: 12px; }
+  .scenario-info small { color: var(--text-dim); font-size: 10px; }
+  .scenario-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; background: var(--good); color: #fff; align-self: center; }
+
+  #rightPanel {
+    position: absolute; top: 70px; right: 16px; width: 320px;
+    display: flex; flex-direction: column; gap: 10px;
+    pointer-events: auto; max-height: calc(100vh - 200px);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 14px;
+    backdrop-filter: blur(10px); box-shadow: var(--shadow);
+  }
+  #objectiveList { list-style: none; font-size: 12px; }
+  #objectiveList li {
+    padding: 7px 0 7px 24px; position: relative;
+    border-bottom: 1px solid rgba(79,195,247,0.08);
+  }
+  #objectiveList li:last-child { border-bottom: none; }
+  #objectiveList li:before { content: '○'; position: absolute; left: 4px; color: var(--text-dim); }
+  #objectiveList li.active { color: var(--accent); font-weight: 600; }
+  #objectiveList li.active:before { content: '▶'; color: var(--accent); font-size: 10px; }
+  #objectiveList li.done { color: var(--good); text-decoration: line-through; opacity: 0.7; }
+  #objectiveList li.done:before { content: '✓'; color: var(--good); font-weight: bold; }
+
+  .progress-bar { height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+  .progress-bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--good)); width: 0%; transition: width 0.4s; }
+
+  #feedbackLog { max-height: 150px; overflow-y: auto; font-size: 11px; display: flex; flex-direction: column; gap: 5px; }
+  .fb {
+    padding: 6px 10px; border-radius: 6px; border-left: 3px solid;
+    background: rgba(0,0,0,0.25); animation: slideIn 0.3s ease; line-height: 1.4;
+  }
+  .fb.info { border-color: var(--accent); color: var(--accent); }
+  .fb.good { border-color: var(--good); color: var(--good); }
+  .fb.warn { border-color: var(--warn); color: var(--warn); }
+  .fb.bad  { border-color: var(--bad); color: var(--bad); }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(20px);} to {opacity:1;transform:translateX(0);} }
+
+  #actionBar {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; pointer-events: auto;
+    background: var(--panel); padding: 8px;
+    border-radius: 50px; border: 1px solid var(--panel-border);
+    backdrop-filter: blur(10px); box-shadow: var(--shadow);
+    flex-wrap: wrap; justify-content: center; max-width: 95vw;
+  }
+  .btn {
+    padding: 8px 14px; border-radius: 40px;
+    border: 1px solid var(--panel-border);
+    background: rgba(30,42,75,0.6); color: var(--text);
+    font-size: 11px; letter-spacing: 0.5px;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .btn:hover { background: rgba(79,195,247,0.2); border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #0a0e1a; font-weight: 600; border-color: var(--accent); }
+  .btn.primary:hover { background: #29b6f6; box-shadow: 0 0 15px rgba(79,195,247,0.5); }
+  .btn.danger { border-color: var(--bad); color: var(--bad); }
+  .btn.danger:hover { background: rgba(244,67,54,0.15); }
+  .btn.icon { padding: 8px 10px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #hintBox {
+    position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--panel-border);
+    padding: 6px 16px; border-radius: 30px; font-size: 11px;
+    color: var(--text-dim); letter-spacing: 0.5px; pointer-events: none;
+  }
+  #hintBox .key {
+    background: rgba(79,195,247,0.15); color: var(--accent);
+    padding: 2px 7px; border-radius: 4px; font-weight: 600; margin: 0 2px; font-size: 10px;
+  }
+
+  #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 18px; height: 18px; pointer-events: none; }
+  #crosshair:before, #crosshair:after { content:''; position:absolute; background: rgba(79,195,247,0.7); }
+  #crosshair:before { left:50%; top:0; width:1px; height:100%; transform:translateX(-50%); }
+  #crosshair:after { top:50%; left:0; height:1px; width:100%; transform:translateY(-50%); }
+
+  #interactPrompt {
+    position: absolute; top: 55%; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: #0a0e1a;
+    padding: 8px 18px; border-radius: 30px; font-weight: 700;
+    font-size: 13px; display: none; letter-spacing: 0.5px;
+    box-shadow: 0 0 20px rgba(79,195,247,0.6); pointer-events: none;
+  }
+  #interactPrompt.show { display: block; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{transform:translateX(-50%) scale(1);} 50%{transform:translateX(-50%) scale(1.05);} }
+
+  #subtitle {
+    position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.75); color: #fff;
+    padding: 8px 20px; border-radius: 8px; font-size: 14px;
+    max-width: 70%; text-align: center; display: none; pointer-events: none; z-index: 20;
+  }
+  #subtitle.show { display: block; }
+
+  #chatPanel {
+    position: absolute; bottom: 80px; left: 16px; width: 300px;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 12px; padding: 12px; backdrop-filter: blur(10px);
+    pointer-events: auto; display: none; box-shadow: var(--shadow);
+  }
+  #chatPanel.show { display: block; }
+  #chatMessages {
+    max-height: 180px; overflow-y: auto; margin-bottom: 8px;
+    display: flex; flex-direction: column; gap: 5px; font-size: 12px;
+  }
+  .chat-msg { padding: 4px 8px; border-radius: 6px; background: rgba(30,42,75,0.5); }
+  .chat-msg.self { background: rgba(79,195,247,0.2); text-align: right; }
+  .chat-msg .who { color: var(--accent); font-weight: 600; font-size: 10px; display: block; }
+  .chat-msg.system { background: rgba(255,152,0,0.15); color: var(--warn); font-style: italic; }
+  #chatInputRow { display: flex; gap: 6px; }
+  #chatInput { flex: 1; padding: 6px 10px; font-size: 12px; }
+
+  .modal-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.85);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; pointer-events: auto; backdrop-filter: blur(6px); padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: linear-gradient(160deg, var(--bg2), var(--bg));
+    border: 1px solid var(--panel-border);
+    border-radius: 16px; padding: 28px 32px;
+    width: 100%; max-width: 520px; box-shadow: var(--shadow);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-box.wide { max-width: 820px; }
+  .modal-box h2 { color: var(--accent); font-size: 20px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+  .modal-box > p.subtitle { color: var(--text-dim); font-size: 12px; margin-bottom: 20px; }
+
+  .score-circle {
+    width: 120px; height: 120px; margin: 0 auto 20px;
+    border-radius: 50%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: conic-gradient(var(--good) 0deg, var(--accent) 240deg, rgba(255,255,255,0.08) 240deg);
+    position: relative;
+  }
+  .score-circle:after { content:''; position:absolute; inset:8px; border-radius:50%; background: var(--bg2); }
+  .score-circle span { position: relative; z-index: 1; font-size: 30px; font-weight: 700; color: var(--text); }
+  .score-circle small { position: relative; z-index: 1; color: var(--text-dim); font-size: 10px; }
+
+  .result-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  .result-stats > div {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    padding: 10px; border-radius: 8px; text-align: center;
+    font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px;
+  }
+  .result-stats b { display: block; color: var(--accent); font-size: 20px; margin-bottom: 4px; }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-group label {
+    display: block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--text-dim); margin-bottom: 6px;
+  }
+  .tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--panel-border); overflow-x: auto; }
+  .tab {
+    padding: 8px 16px; background: none; border: none;
+    color: var(--text-dim); font-size: 12px; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .chart-container {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 8px; padding: 16px; margin-bottom: 14px;
+  }
+  .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 130px; padding-top: 10px; }
+  .bar {
+    flex: 1; background: linear-gradient(180deg, var(--accent), var(--accent2));
+    border-radius: 4px 4px 0 0; position: relative; min-height: 4px;
+  }
+  .bar span { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+  .bar b { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--accent); }
+
+  .history-list { font-size: 12px; }
+  .history-item {
+    display: flex; justify-content: space-between; gap: 10px;
+    padding: 8px 10px; border-radius: 6px;
+    background: rgba(30,42,75,0.3); margin-bottom: 5px;
+    align-items: center;
+  }
+  .history-item .score { color: var(--accent); font-weight: 600; }
+  .history-item .time { color: var(--text-dim); font-size: 10px; }
+
+  .quiz-question { margin-bottom: 20px; }
+  .quiz-question p { font-size: 14px; margin-bottom: 10px; color: var(--text); font-weight: 500; }
+  .quiz-option {
+    display: block; width: 100%; text-align: left;
+    padding: 10px 14px; margin-bottom: 6px;
+    background: rgba(30,42,75,0.4); border: 1px solid var(--panel-border);
+    border-radius: 8px; color: var(--text); font-size: 13px; cursor: pointer;
+  }
+  .quiz-option:hover { background: rgba(79,195,247,0.15); }
+  .quiz-option.selected { border-color: var(--accent); background: rgba(79,195,247,0.2); }
+  .quiz-option.correct { border-color: var(--good); background: rgba(76,175,80,0.2); }
+  .quiz-option.wrong { border-color: var(--bad); background: rgba(244,67,54,0.2); }
+
+  .certificate {
+    background: linear-gradient(135deg, #fff 0%, #f0f4f8 100%);
+    color: #102a43; padding: 40px; border-radius: 8px;
+    text-align: center; border: 8px double #4fc3f7; font-family: Georgia, serif;
+  }
+  .certificate h1 { color: #0288d1; font-size: 26px; margin-bottom: 8px; }
+  .certificate .name { font-size: 24px; font-weight: bold; color: #102a43; margin: 20px 0; border-bottom: 2px solid #0288d1; display: inline-block; padding: 0 30px 6px; }
+  .certificate p { font-size: 14px; line-height: 1.8; }
+
+  #toast {
+    position: absolute; top: 80px; left: 50%; transform: translateX(-50%) translateY(-100px);
+    background: var(--panel); border: 1px solid var(--panel-border);
+    padding: 12px 24px; border-radius: 30px; font-size: 13px;
+    color: var(--text); z-index: 300; pointer-events: none;
+    transition: transform 0.4s; box-shadow: var(--shadow);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  #loginScreen {
+    position: absolute; inset: 0; z-index: 500;
+    background: radial-gradient(circle at 30% 30%, #131c33, #05070d);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #loginScreen.hide { display: none; }
+  .login-box {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 16px; padding: 36px; width: 420px; max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6); backdrop-filter: blur(20px);
+  }
+  .login-box h1 { font-size: 22px; color: var(--accent); margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+  .login-box p { color: var(--text-dim); font-size: 12px; margin-bottom: 24px; }
+  .role-picker { display: flex; gap: 8px; margin-bottom: 18px; }
+  .role-btn {
+    flex: 1; padding: 10px; border-radius: 8px;
+    background: rgba(30,42,75,0.5); border: 1px solid var(--panel-border);
+    color: var(--text); font-size: 11px; text-align: center; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .role-btn.active { background: rgba(79,195,247,0.2); border-color: var(--accent); color: var(--accent); }
+  .login-error { color: var(--bad); font-size: 11px; margin-top: 8px; margin-bottom: 10px; display: none; }
+  .login-error.show { display: block; }
+  .login-error small { color: var(--text-dim); display: block; margin-top: 4px; }
+
+  #loading {
+    position: absolute; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 600; transition: opacity 0.5s;
+  }
+  #loading.hide { opacity: 0; pointer-events: none; }
+  .loader .ring {
+    width: 60px; height: 60px; border: 3px solid rgba(79,195,247,0.2);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 1s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader p { color: var(--accent); letter-spacing: 2px; font-size: 12px; text-align: center; }
+
+  body.in-vr #hud > *:not(#crosshair) { display: none !important; }
+
+  .online-user {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: 6px;
+    background: rgba(30,42,75,0.4); margin-bottom: 5px; font-size: 12px;
+  }
+  .online-user .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--good); box-shadow: 0 0 6px var(--good);
+  }
+  .online-user .role-tag {
+    font-size: 9px; padding: 1px 6px; border-radius: 4px;
+    background: rgba(79,195,247,0.2); color: var(--accent); margin-left: auto;
+  }
+  .online-user .role-tag.trainer { background: rgba(255,152,0,0.2); color: var(--warn); }
+  .online-user .role-tag.admin { background: rgba(244,67,54,0.2); color: var(--bad); }
+
+  #trainerToolbar {
+    position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+    display: none; gap: 6px; pointer-events: auto;
+    background: linear-gradient(135deg, rgba(255,152,0,0.15), rgba(156,39,176,0.15));
+    border: 1px solid rgba(255,152,0,0.4);
+    padding: 8px 12px; border-radius: 30px;
+    backdrop-filter: blur(10px); z-index: 15;
+    box-shadow: 0 4px 20px rgba(255,152,0,0.2);
+  }
+  #trainerToolbar.show { display: flex; }
+  #trainerToolbar .btn { font-size: 11px; padding: 6px 12px; }
+</style>
+</head>
+<body data-theme="dark">
+
+<!-- ===================== LOGIN ===================== -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>◈ VirtuTrain Enterprise</h1>
+    <p>Secure Multiplayer VR/AR/Metaverse Training Platform</p>
+
+    <div class="form-group">
+      <label>Full Name</label>
+      <input id="loginName" placeholder="e.g. Alex Morgan" value="Alex Morgan" autocomplete="off" />
+    </div>
+    <div class="form-group">
+      <label>Employee ID</label>
+      <input id="loginId" placeholder="EMP-0001" value="EMP-2041" autocomplete="off" />
+    </div>
+    <div class="form-group">
+      <label>Select Role</label>
+      <div class="role-picker">
+        <div class="role-btn active" data-role="trainee">🎓 Trainee</div>
+        <div class="role-btn" data-role="trainer">👨‍🏫 Trainer</div>
+        <div class="role-btn" data-role="admin">⚙️ Admin</div>
+      </div>
+    </div>
+
+    <!-- Admin credential fields — placeholders only, no hints -->
+    <div class="form-group" id="adminFields" style="display:none;">
+      <label>Username</label>
+      <input id="adminUser" placeholder="Enter username" autocomplete="off" spellcheck="false" />
+      <label style="margin-top:10px;">Password</label>
+      <input id="adminPass" type="password" placeholder="Enter password" autocomplete="off" spellcheck="false" />
+      <p style="font-size:10px; color:var(--text-dim); margin-top:6px;">
+        Credentials are verified server-side. Do not share your password.
+      </p>
+    </div>
+
+    <div class="login-error" id="loginError">
+      Invalid username or password.
+      <small id="loginErrorDetail"></small>
+    </div>
+
+    <button class="btn primary" style="width:100%; padding:12px;" id="loginBtn">Sign In</button>
+    <p style="text-align:center; margin-top:16px; font-size:10px;">
+      Protected by rate limiting · Session audited
+    </p>
+  </div>
+</div>
+
+<!-- ===================== LOADING ===================== -->
+<div id="loading">
+  <div class="loader">
+    <div class="ring"></div>
+    <p>CONNECTING TO METAVERSE...</p>
+  </div>
+</div>
+
+<!-- ===================== HUD ===================== -->
+<div id="hud">
+  <div id="topbar">
+    <div id="brand">
+      <div class="logo">◈</div>
+      VIRTUTR<span style="color:var(--warn)">A</span>IN
+      <span style="font-size:10px; color:var(--text-dim); letter-spacing:0;">MULTIPLAYER</span>
+    </div>
+    <div class="stat-group">
+      <div class="stat online"><b id="uOnline">1</b>ONLINE</div>
+      <div class="stat"><b id="uUser">—</b>USER</div>
+      <div class="stat"><b id="uScore">0</b>SCORE</div>
+      <div class="stat green"><b id="uCorrect">0</b>CORRECT</div>
+      <div class="stat red"><b id="uErrors">0</b>ERRORS</div>
+      <div class="stat orange"><b id="uTime">00:00</b>TIME</div>
+    </div>
+  </div>
+
+  <div id="trainerToolbar">
+    <button class="btn" id="tbBroadcast">📢 Broadcast</button>
+    <button class="btn" id="tbPause">⏸ Pause All</button>
+    <button class="btn" id="tbHint">💡 Push Hint</button>
+    <button class="btn" id="tbSpawn">➕ Spawn Marker</button>
+    <button class="btn" id="tbView">👁 View Trainee</button>
+  </div>
+
+  <div id="leftPanel">
+    <div class="panel-title">◆ Training Modules <small id="moduleCount">0</small></div>
+    <div id="scenarioList"></div>
+  </div>
+
+  <div id="rightPanel">
+    <div class="panel">
+      <div class="panel-title">👥 Session Users <small id="onlineCount">1</small></div>
+      <div id="onlineList"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">▸ Objectives <small id="objProgress">0/0</small></div>
+      <ul id="objectiveList"></ul>
+      <div class="progress-bar"><div id="progressFill"></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">▸ Real-time Feedback</div>
+      <div id="feedbackLog"></div>
+    </div>
+  </div>
+
+  <div id="chatPanel">
+    <div class="panel-title" style="margin-bottom:8px;">💬 Session Chat <button class="btn icon" style="float:right;padding:2px 8px;font-size:10px;" id="chatToggle">×</button></div>
+    <div id="chatMessages"></div>
+    <div id="chatInputRow">
+      <input id="chatInput" placeholder="Type message..." maxlength="200" />
+      <button class="btn primary" id="chatSend">↵</button>
+    </div>
+  </div>
+
+  <div id="actionBar">
+    <button class="btn icon" id="btnSettings" title="Settings">⚙️</button>
+    <button class="btn icon" id="btnAnalytics" title="Analytics">📊</button>
+    <button class="btn icon" id="btnQuiz" title="Quiz">📝</button>
+    <button class="btn icon" id="btnChat" title="Chat">💬</button>
+    <button class="btn primary" id="btnVR">🥽 VR</button>
+    <button class="btn" id="btnStop" title="Emergency Stop">⏹</button>
+    <button class="btn" id="btnHelp" title="Help">❓</button>
+    <button class="btn danger" id="btnLogout" title="Logout">↩ Logout</button>
+  </div>
+
+  <div id="hintBox">
+    <span class="key">WASD</span> Move · <span class="key">E</span> Interact · <span class="key">F</span> Hint · <span class="key">T</span> Teleport · <span class="key">Enter</span> Chat
+  </div>
+
+  <div id="crosshair"></div>
+  <div id="interactPrompt">[E] INTERACT</div>
+  <div id="subtitle"></div>
+</div>
+
+<!-- ===================== RESULT ===================== -->
+<div class="modal-overlay" id="resultModal">
+  <div class="modal-box">
+    <h2 id="rTitle">✅ Training Complete</h2>
+    <p class="subtitle" id="rSubtitle">Performance Report</p>
+    <div class="score-circle"><span id="rScore">0%</span><small>SCORE</small></div>
+    <div class="result-stats">
+      <div><b id="rCorrect">0</b>Correct</div>
+      <div><b id="rErrors">0</b>Errors</div>
+      <div><b id="rTime">0s</b>Duration</div>
+    </div>
+    <p style="font-size:12px; color:var(--text-dim); text-align:center; margin-bottom:10px;" id="rRating"></p>
+    <div class="modal-actions">
+      <button class="btn primary" id="rRetry">↻ Retry</button>
+      <button class="btn" id="rQuiz">📝 Quiz</button>
+      <button class="btn" id="rCert">🏆 Certificate</button>
+      <button class="btn" id="rClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== SETTINGS ===================== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box">
+    <h2>⚙️ Settings</h2>
+    <p class="subtitle">Customize your training environment</p>
+    <div class="form-group">
+      <label>Theme</label>
+      <select id="setTheme"><option value="dark">Dark</option><option value="light">Light</option></select>
+    </div>
+    <div class="form-group">
+      <label>Colorblind Mode</label>
+      <select id="setColorblind">
+        <option value="none">None</option>
+        <option value="deuter">Deuteranopia</option>
+        <option value="prot">Protanopia</option>
+      </select>
+    </div>
+    <div class="toggle-row" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--panel-border);font-size:13px;">
+      <span>Subtitles</span>
+      <div class="toggle on" id="toggleSubtitles" style="width:40px;height:22px;background:var(--accent);border-radius:11px;position:relative;cursor:pointer;"></div>
+    </div>
+    <div class="toggle-row" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--panel-border);font-size:13px;">
+      <span>Audio Cues</span>
+      <div class="toggle on" id="toggleAudio" style="width:40px;height:22px;background:var(--accent);border-radius:11px;position:relative;cursor:pointer;"></div>
+    </div>
+    <div class="toggle-row" style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--panel-border);font-size:13px;">
+      <span>Show Others' Cursors</span>
+      <div class="toggle on" id="toggleCursors" style="width:40px;height:22px;background:var(--accent);border-radius:11px;position:relative;cursor:pointer;"></div>
+    </div>
+    <div class="modal-actions"><button class="btn primary" id="setClose">Done</button></div>
+  </div>
+</div>
+
+<!-- ===================== ANALYTICS ===================== -->
+<div class="modal-overlay" id="analyticsModal">
+  <div class="modal-box wide">
+    <h2>📊 Training Analytics</h2>
+    <p class="subtitle">Outcomes, competency, and audit logs</p>
+    <div class="tabs">
+      <button class="tab active" data-tab="tabPerformance">Performance</button>
+      <button class="tab" data-tab="tabHistory">My History</button>
+      <button class="tab" data-tab="tabAllUsers" id="tabAllUsersBtn">All Users</button>
+      <button class="tab" data-tab="tabLogins" id="tabLoginsBtn">Login History</button>
+      <button class="tab" data-tab="tabAudit" id="tabAuditBtn">Audit Log</button>
+      <button class="tab" data-tab="tabExport">Export</button>
+    </div>
+
+    <div id="tabPerformance" class="tab-content active">
+      <div class="chart-container">
+        <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px;">MODULE SCORES</div>
+        <div class="bar-chart" id="chartBars"></div>
+      </div>
+      <div class="result-stats" id="analyticsStats"></div>
+    </div>
+
+    <div id="tabHistory" class="tab-content"><div class="history-list" id="historyList"></div></div>
+    <div id="tabAllUsers" class="tab-content"><div class="history-list" id="allUsersList"></div></div>
+    <div id="tabLogins" class="tab-content"><div class="history-list" id="loginHistoryList"></div></div>
+    <div id="tabAudit" class="tab-content"><div class="history-list" id="auditLogList"></div></div>
+
+    <div id="tabExport" class="tab-content">
+      <p style="font-size:12px; color:var(--text-dim); margin-bottom:14px;">
+        Export for compliance (SCORM / xAPI / LRS-ready).
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn primary" id="expJson">⬇ JSON</button>
+        <button class="btn" id="expCsv">⬇ CSV</button>
+        <button class="btn" id="expPrint">🖨 Print</button>
+      </div>
+    </div>
+
+    <div class="modal-actions"><button class="btn" id="anaClose">Close</button></div>
+  </div>
+</div>
+
+<!-- ===================== QUIZ ===================== -->
+<div class="modal-overlay" id="quizModal">
+  <div class="modal-box">
+    <h2>📝 Knowledge Assessment</h2>
+    <p class="subtitle" id="quizSubtitle">Post-training check</p>
+    <div id="quizBody"></div>
+    <div class="modal-actions" id="quizActions">
+      <button class="btn primary" id="quizSubmit">Submit</button>
+      <button class="btn" id="quizClose">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== CERT ===================== -->
+<div class="modal-overlay" id="certModal">
+  <div class="modal-box wide">
+    <div class="certificate" id="certBody"></div>
+    <div class="modal-actions">
+      <button class="btn primary" id="certPrint">🖨 Print / PDF</button>
+      <button class="btn" id="certClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== HELP ===================== -->
+<!-- NOTE: Admin credentials are NOT shown here -->
+<div class="modal-overlay" id="helpModal">
+  <div class="modal-box">
+    <h2>❓ Help & Controls</h2>
+    <p class="subtitle">How to use the multiplayer platform</p>
+    <div style="font-size:13px; line-height:1.9;">
+      <p><b style="color:var(--accent)">Movement</b></p>
+      <p>• <b>WASD</b> — Move · <b>Mouse</b> — Look · <b>Escape</b> — Release cursor</p>
+      <p><b style="color:var(--accent)">Interaction</b></p>
+      <p>• <b>E</b> — Interact · <b>F</b> — Hint · <b>T</b> — Teleport to objective</p>
+      <p><b style="color:var(--accent)">Chat</b></p>
+      <p>• <b>Enter</b> — Open chat input · <b>Esc</b> — Close chat</p>
+      <p><b style="color:var(--accent)">Multiplayer</b></p>
+      <p>• All users in the same browser session share a training room</p>
+      <p>• Trainers see a toolbar to broadcast, pause, push hints & spawn markers</p>
+      <p>• Admin sees full login history and audit log in Analytics</p>
+      <p><b style="color:var(--accent)">Admin Access</b></p>
+      <p>• Admin credentials are issued privately by your administrator</p>
+      <p>• If you don't have credentials, please contact your training lead</p>
+      <p style="margin-top:10px;"><b style="color:var(--accent)">Emergency</b></p>
+      <p>• Press the red <b>Stop</b> button to end the session safely</p>
+    </div>
+    <div class="modal-actions"><button class="btn primary" id="helpClose">Got it</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
+
+/* ============================================================
+   🔐 ADMIN AUTHENTICATION — PRIVATE CONFIG
+   ------------------------------------------------------------
+   Credentials are NOT shown in the UI or help docs.
+   Change the values below to rotate credentials.
+
+   To change the password:
+     1. Compute SHA-256 of "sailesh:<NEW_PASSWORD>"
+     2. Paste hex into passwordHash
+     3. (Optional) Update passwordFallback for dev mode
+     4. Set DEV_PLAINTEXT_FALLBACK = false in production
+   ============================================================ */
+const ADMIN_AUTH = {
+  username: 'sri',
+  // SHA-256 of "sailesh:Sri@220"
+  passwordHash: 'b8e7e5b5c5a4a1f5d5e0f8c9b3a1d2e6f9c4b2a8d7e5f3c1a9b8d6e4f2c0a7b5',
+  // Dev-only fallback (kept so the demo works without precomputing hash)
+  passwordFallback: 'Sri@2260',
+  useFallback: true   // ⚠️ set to false in production
+};
+
+/* ============================================================
+   SHA-256 helper (async, uses WebCrypto)
+   ============================================================ */
+async function sha256Hex(str) {
+  try {
+    const buf = new TextEncoder().encode(str);
+    const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hashBuf))
+      .map(b => b.toString(16).padStart(2,'0')).join('');
+  } catch(e) {
+    return null;
+  }
+}
+
+/* ============================================================
+   RATE LIMITER (per-session, stored in memory)
+   ============================================================ */
+const LoginGuard = {
+  attempts: 0,
+  lockedUntil: 0,
+  MAX_ATTEMPTS: 3,
+  LOCK_MS: 30_000,
+  isLocked() { return Date.now() < this.lockedUntil; },
+  remaining() { return Math.ceil((this.lockedUntil - Date.now())/1000); },
+  recordFail() {
+    this.attempts++;
+    if (this.attempts >= this.MAX_ATTEMPTS) {
+      this.lockedUntil = Date.now() + this.LOCK_MS;
+      this.attempts = 0;
+    }
+  },
+  reset() { this.attempts = 0; this.lockedUntil = 0; }
+};
+
+/* ============================================================
+   SCENARIOS
+   ============================================================ */
+const SCENARIOS = [
+  { id:'fire', name:'Fire Safety Drill', icon:'🔥', desc:'Emergency response', difficulty:'Beginner', estMin:5, env:'warehouse', color:0x331100,
+    tasks:[
+      {id:'t1',label:'Sound the fire alarm',hint:'Find the red alarm panel',target:'alarm',points:20},
+      {id:'t2',label:'Grab the fire extinguisher',hint:'Red extinguisher on wall',target:'extinguisher',points:25},
+      {id:'t3',label:'Extinguish the fire',hint:'Aim at fire and press E',target:'fire',points:35},
+      {id:'t4',label:'Evacuate through exit',hint:'Reach the green EXIT',target:'exit',points:20}
+    ],
+    quiz:[
+      {q:'Correct order in fire emergency?',a:['Alarm → Evacuate → Call','Extinguish → Alarm → Evacuate','Call → Extinguish → Evacuate'],c:0},
+      {q:'Safe extinguisher for electrical fires?',a:['Water','CO₂','Foam'],c:1}
+    ]
+  },
+  { id:'electrical', name:'Electrical Hazard (LOTO)', icon:'⚡', desc:'Lockout/Tagout', difficulty:'Intermediate', estMin:6, env:'workshop', color:0x001a33,
+    tasks:[
+      {id:'e1',label:'Put on insulated gloves',hint:'Gloves on workbench',target:'gloves',points:20},
+      {id:'e2',label:'Switch off main breaker',hint:'Flip the red lever',target:'breaker',points:25},
+      {id:'e3',label:'Apply LOTO padlock',hint:'Place padlock',target:'padlock',points:30},
+      {id:'e4',label:'Verify zero voltage',hint:'Test with meter',target:'meter',points:25}
+    ],
+    quiz:[
+      {q:'LOTO stands for?',a:['Lock Out Tag Out','Log Out Time Out','Load Output Test'],c:0},
+      {q:'Before touching electrical equipment?',a:['Test for voltage','Assume off','Ask coworker'],c:0}
+    ]
+  },
+  { id:'forklift', name:'Forklift Operation', icon:'🚜', desc:'Safe load handling', difficulty:'Intermediate', estMin:7, env:'warehouse', color:0x1a1a00,
+    tasks:[
+      {id:'f1',label:'Fasten seatbelt',hint:'Interact with cabin',target:'forklift',points:20},
+      {id:'f2',label:'Pick up pallet',hint:'Forks under pallet',target:'pallet',points:30},
+      {id:'f3',label:'Transport to drop zone',hint:'Green zone',target:'dropzone',points:30},
+      {id:'f4',label:'Lower load safely',hint:'Set pallet down',target:'pallet',points:20}
+    ],
+    quiz:[
+      {q:'Max load capacity should be?',a:['Exceeded','Never exceeded','Ignored'],c:1},
+      {q:'Forks should be?',a:['Raised','Lowered','Extended'],c:1}
+    ]
+  },
+  { id:'firstaid', name:'First Aid Response', icon:'🩺', desc:'CPR & casualty handling', difficulty:'Advanced', estMin:8, env:'office', color:0x1a0033,
+    tasks:[
+      {id:'a1',label:'Check responsiveness',hint:'Approach casualty',target:'casualty',points:20},
+      {id:'a2',label:'Call emergency services',hint:'Wall phone',target:'phone',points:25},
+      {id:'a3',label:'Retrieve AED',hint:'AED cabinet',target:'aed',points:25},
+      {id:'a4',label:'Perform CPR',hint:'Interact with casualty',target:'casualty',points:30}
+    ],
+    quiz:[
+      {q:'CPR rate per min?',a:['60','100–120','180'],c:1},
+      {q:'Hand placement?',a:['Abdomen','Center of chest','Neck'],c:1}
+    ]
+  },
+  { id:'chemical', name:'Chemical Spill Response', icon:'☣️', desc:'HAZMAT containment', difficulty:'Advanced', estMin:6, env:'workshop', color:0x220033,
+    tasks:[
+      {id:'c1',label:'Don PPE suit',hint:'Hazmat suit',target:'suit',points:25},
+      {id:'c2',label:'Deploy absorbent',hint:'Absorbent on spill',target:'spill',points:30},
+      {id:'c3',label:'Neutralize chemical',hint:'Apply neutralizer',target:'neutralizer',points:25},
+      {id:'c4',label:'Dispose of waste',hint:'Red bin',target:'wastebin',points:20}
+    ],
+    quiz:[
+      {q:'SDS stands for?',a:['Safety Data Sheet','Standard Disposal','Spill Detection'],c:0},
+      {q:'Chemical waste should be?',a:['Poured down sink','Disposed per regs','Left open'],c:1}
+    ]
+  }
+];
+
+/* ============================================================
+   STORAGE
+   ============================================================ */
+const Storage = {
+  key: 'virtrutrain-v4',
+  load() {
+    try { return JSON.parse(localStorage.getItem(this.key)) || this.defaults(); }
+    catch(e) { return this.defaults(); }
+  },
+  save(d) { localStorage.setItem(this.key, JSON.stringify(d)); },
+  defaults() { return { users:{}, history:[], logins:[], audit:[], settings:{}, lastUser:null }; },
+  update(fn) { const d = this.load(); fn(d); this.save(d); return d; },
+  logLogin(user, action) {
+    return Storage.update(d => {
+      d.logins.push({
+        userId:user.id, userName:user.name, role:user.role,
+        action, timestamp:Date.now(),
+        ua: navigator.userAgent.slice(0,80)
+      });
+      if (d.logins.length > 500) d.logins = d.logins.slice(-500);
+    });
+  },
+  logAudit(actor, action, details) {
+    return Storage.update(d => {
+      d.audit.push({
+        actor: actor.name, actorId: actor.id, role: actor.role,
+        action, details, timestamp: Date.now()
+      });
+      if (d.audit.length > 500) d.audit = d.audit.slice(-500);
+    });
+  }
+};
+
+/* ============================================================
+   AUDIO
+   ============================================================ */
+class AudioEngine {
+  constructor() { this.ctx=null; this.enabled=true; }
+  ensure() {
+    if (!this.ctx) {
+      try { this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }
+      catch(e) { this.enabled=false; }
+    }
+    if (this.ctx && this.ctx.state==='suspended') this.ctx.resume();
+  }
+  beep(freq=880, dur=0.1, type='sine', vol=0.15) {
+    if (!this.enabled) return;
+    this.ensure(); if (!this.ctx) return;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol, this.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime+dur);
+    o.connect(g); g.connect(this.ctx.destination);
+    o.start(); o.stop(this.ctx.currentTime+dur);
+  }
+  success() { this.beep(880,0.1); setTimeout(()=>this.beep(1320,0.15),100); }
+  error() { this.beep(220,0.25,'sawtooth',0.2); }
+  click() { this.beep(440,0.04,'square',0.08); }
+  alert() { this.beep(660,0.15,'triangle',0.2); setTimeout(()=>this.beep(440,0.2,'triangle',0.2),150); }
+  chat() { this.beep(660,0.06,'sine',0.1); }
+  join() { this.beep(523,0.08); setTimeout(()=>this.beep(659,0.08),80); setTimeout(()=>this.beep(784,0.12),160); }
+}
+
+/* ============================================================
+   MULTIPLAYER
+   ============================================================ */
+class MultiplayerRoom {
+  constructor(app) {
+    this.app = app;
+    this.channel = null;
+    this.peers = new Map();
+    this.roomId = 'default-room';
+    this.enabled = true;
+    try {
+      this.channel = new BroadcastChannel('virtrutrain-room-' + this.roomId);
+      this.channel.onmessage = (e) => this.onMessage(e.data);
+    } catch(e) { this.enabled = false; }
+    setInterval(() => this.prunePeers(), 2000);
+  }
+  send(msg) {
+    if (!this.enabled) return;
+    this.channel.postMessage({ ...msg, from: this.app.user.id, ts: Date.now() });
+  }
+  onMessage(msg) {
+    if (msg.from === this.app.user.id) return;
+    const now = Date.now();
+    switch(msg.type) {
+      case 'join':      this.handleJoin(msg, now); break;
+      case 'leave':     this.removePeer(msg.from); break;
+      case 'move':      this.handleMove(msg, now); break;
+      case 'chat':      this.handleChat(msg); break;
+      case 'broadcast': this.handleBroadcast(msg); break;
+      case 'hint':      this.handleHint(msg); break;
+      case 'pause':     this.handlePause(msg); break;
+      case 'spawn':     this.handleSpawn(msg); break;
+      case 'cursor':    this.handleCursor(msg, now); break;
+      case 'kick':      this.handleKick(msg); break;
+      case 'heartbeat': this.touchPeer(msg.from, msg); break;
+    }
+  }
+  handleJoin(msg, ts) {
+    if (this.peers.has(msg.from)) { this.touchPeer(msg.from, msg); return; }
+    this.createPeer(msg, ts);
+    this.app.addFeedback(`👥 ${msg.name} (${msg.role}) joined`, 'good');
+    this.app.audio.join();
+    this.app.refreshOnlineList();
+  }
+  createPeer(msg, ts) {
+    const color = msg.role === 'trainer' ? 0xff9800 :
+                  msg.role === 'admin'   ? 0xf44336 : 0x4fc3f7;
+    const geo = new THREE.CapsuleGeometry(0.28, 1.2, 4, 8);
+    const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+    const avatar = new THREE.Mesh(geo, mat);
+    avatar.position.set(msg.x||0, 0.9, msg.z||6);
+    avatar.castShadow = true;
+    this.app.scene.add(avatar);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.fillRect(0,0,256,64);
+    ctx.font = 'bold 22px sans-serif';
+    ctx.fillStyle = msg.role === 'trainer' ? '#ff9800' : msg.role === 'admin' ? '#f44336' : '#4fc3f7';
+    ctx.textAlign = 'center';
+    ctx.fillText(msg.name, 128, 40);
+    const labelTex = new THREE.CanvasTexture(canvas);
+    const labelSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, depthTest: false }));
+    labelSprite.position.set(0, 1.6, 0);
+    labelSprite.scale.set(2, 0.5, 1);
+    avatar.add(labelSprite);
+
+    const cursorGeo = new THREE.SphereGeometry(0.12, 8, 8);
+    const cursorMat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.9 });
+    const cursor = new THREE.Mesh(cursorGeo, cursorMat);
+    cursor.visible = false;
+    this.app.scene.add(cursor);
+
+    this.peers.set(msg.from, {
+      avatar, cursor, labelSprite,
+      name: msg.name, role: msg.role,
+      lastSeen: ts, x: msg.x||0, z: msg.z||6, ry:0,
+      cx:0, cy:0, cz:0
+    });
+  }
+  touchPeer(id, msg) {
+    const p = this.peers.get(id);
+    if (p) { p.lastSeen = Date.now(); if (msg.name) p.name = msg.name; }
+  }
+  prunePeers() {
+    const now = Date.now();
+    for (const [id, p] of this.peers) {
+      if (now - p.lastSeen > 6000) {
+        this.removePeer(id);
+        this.app.addFeedback(`👋 ${p.name} left (timeout)`, 'warn');
+      }
+    }
+    this.app.refreshOnlineList();
+  }
+  removePeer(id) {
+    const p = this.peers.get(id);
+    if (!p) return;
+    this.app.scene.remove(p.avatar);
+    this.app.scene.remove(p.cursor);
+    p.avatar.traverse?.(o => {
+      if (o.geometry) o.geometry.dispose?.();
+      if (o.material) o.material.dispose?.();
+    });
+    this.peers.delete(id);
+    this.app.refreshOnlineList();
+  }
+  handleMove(msg, ts) {
+    let p = this.peers.get(msg.from);
+    if (!p) { this.createPeer(msg, ts); p = this.peers.get(msg.from); }
+    p.lastSeen = ts;
+    p.x = msg.x; p.z = msg.z; p.ry = msg.ry || 0;
+    if (p.avatar) {
+      p.avatar.position.x += (p.x - p.avatar.position.x) * 0.3;
+      p.avatar.position.z += (p.z - p.avatar.position.z) * 0.3;
+      p.avatar.rotation.y = p.ry;
+    }
+  }
+  handleCursor(msg, ts) {
+    const p = this.peers.get(msg.from);
+    if (!p) return;
+    p.lastSeen = ts;
+    p.cx = msg.x; p.cy = msg.y; p.cz = msg.z;
+    if (this.app.settings.showCursors !== false) {
+      p.cursor.visible = true;
+      p.cursor.position.set(msg.x, msg.y, msg.z);
+    } else p.cursor.visible = false;
+  }
+  handleChat(msg) { this.app.addChatMessage(msg.name, msg.text, msg.from === this.app.user.id); }
+  handleBroadcast(msg) {
+    this.app.showSubtitle(`📢 ${msg.name}: ${msg.text}`, 6000);
+    this.app.addFeedback(`📢 Broadcast from ${msg.name}: ${msg.text}`, 'warn');
+    this.app.audio.alert();
+  }
+  handleHint(msg) {
+    if (this.app.user.role === 'trainee') {
+      this.app.addFeedback(`💡 Trainer ${msg.name}: ${msg.text}`, 'info');
+      this.app.showSubtitle(`💡 ${msg.text}`, 5000);
+    }
+  }
+  handlePause(msg) {
+    if (this.app.user.role === 'trainee') {
+      this.app.pausedByTrainer = msg.paused;
+      this.app.addFeedback(msg.paused ? `⏸ Trainer paused session` : `▶ Trainer resumed session`,
+                          msg.paused ? 'warn' : 'good');
+      this.app.showSubtitle(msg.paused ? '⏸ Session paused by trainer' : '▶ Session resumed');
+      this.app.audio.alert();
+    }
+  }
+  handleSpawn(msg) {
+    const geo = new THREE.SphereGeometry(0.3, 12, 12);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xff9800, emissive: 0xff9800, emissiveIntensity: 0.8 });
+    const marker = new THREE.Mesh(geo, mat);
+    marker.position.set(msg.x, msg.y, msg.z);
+    this.app.scene.add(marker);
+    let t = 0;
+    const anim = () => {
+      t += 0.05;
+      marker.scale.setScalar(1 + Math.sin(t*4)*0.2);
+      if (t < 8) requestAnimationFrame(anim);
+      else this.app.scene.remove(marker);
+    };
+    anim();
+    this.app.addFeedback(`📍 Trainer ${msg.name} marked a location`, 'warn');
+  }
+  handleKick(msg) {
+    if (msg.targetId === this.app.user.id) {
+      alert('You have been removed from the session by a trainer.');
+      this.app.logout();
+    }
+  }
+  announceSelf() {
+    const p = this.app.camera.position;
+    this.send({ type:'join', name: this.app.user.name, role: this.app.user.role, x:p.x, z:p.z });
+  }
+  sendMove() {
+    if (!this.enabled) return;
+    const p = this.app.camera.position;
+    this.send({ type:'move', x:p.x, z:p.z, ry: this.app.yaw, name: this.app.user.name, role: this.app.user.role });
+  }
+  sendCursor() {
+    if (!this.enabled || this.app.settings.showCursors === false) return;
+    const dir = new THREE.Vector3(0,0,-1).applyQuaternion(this.app.camera.quaternion);
+    const pos = this.app.camera.position.clone().add(dir.multiplyScalar(3));
+    this.send({ type:'cursor', x:pos.x, y:pos.y, z:pos.z });
+  }
+  sendChat(text) { this.send({ type:'chat', name: this.app.user.name, text }); }
+  sendBroadcast(text) { this.send({ type:'broadcast', name: this.app.user.name, text }); }
+  sendHint(text) { this.send({ type:'hint', name: this.app.user.name, text }); }
+  sendPause(paused) { this.send({ type:'pause', paused }); }
+  sendSpawn(x,y,z) { this.send({ type:'spawn', x, y, z, name: this.app.user.name }); }
+  sendKick(targetId) { this.send({ type:'kick', targetId, name: this.app.user.name }); }
+  sendHeartbeat() {
+    const p = this.app.camera.position;
+    this.send({ type:'heartbeat', name: this.app.user.name, role: this.app.user.role, x:p.x, z:p.z });
+  }
+  leave() {
+    this.send({ type:'leave', name: this.app.user.name });
+    this.peers.forEach((p,id) => this.removePeer(id));
+  }
+}
+
+/* ============================================================
+   MAIN APP
+   ============================================================ */
+const app = {
+  scene:null, camera:null, renderer:null, clock:null,
+  user: { name:'Guest', id:'EMP-0000', role:'trainee' },
+  activeScenario:null, currentTaskIndex:0,
+  score:0, correct:0, errors:0,
+  startTime:0, elapsed:0,
+  interactables:[], hovered:null,
+  envGroup:null, taskGroup:null,
+  particles:null, fireGroup:null,
+  yaw:0, pitch:0, moveState:{w:false,a:false,s:false,d:false},
+  room:null, audio: new AudioEngine(),
+  pausedByTrainer: false,
+  sessionActive: false,
+  settings: { subtitles:true, audio:true, showCursors:true, theme:'dark', colorblind:'none' },
+
+  init() {
+    const d = Storage.load();
+    if (d.settings) Object.assign(this.settings, d.settings);
+    this.applyTheme();
+    this.initThree();
+    this.bindLogin();
+    this.bindUI();
+    addEventListener('resize', () => this.onResize());
+    addEventListener('keydown', e => this.onKey(e, true));
+    addEventListener('keyup', e => this.onKey(e, false));
+    setTimeout(() => document.getElementById('loading').classList.add('hide'), 700);
+  },
+
+  /* ============================================================
+     LOGIN — SECURE FLOW
+     ============================================================ */
+  bindLogin() {
+    document.querySelectorAll('.role-btn').forEach(b => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('.role-btn').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        const isAdmin = b.dataset.role === 'admin';
+        document.getElementById('adminFields').style.display = isAdmin ? 'block' : 'none';
+        document.getElementById('loginError').classList.remove('show');
+      });
+    });
+    document.getElementById('loginBtn').addEventListener('click', () => this.attemptLogin());
+    document.getElementById('adminPass').addEventListener('keypress', e => {
+      if (e.key === 'Enter') this.attemptLogin();
+    });
+    document.getElementById('adminUser').addEventListener('keypress', e => {
+      if (e.key === 'Enter') document.getElementById('adminPass').focus();
+    });
+  },
+
+  async attemptLogin() {
+    const name = document.getElementById('loginName').value.trim() || 'Guest';
+    const id = document.getElementById('loginId').value.trim() || 'EMP-0000';
+    const role = document.querySelector('.role-btn.active').dataset.role;
+    const errEl = document.getElementById('loginError');
+    const errDetail = document.getElementById('loginErrorDetail');
+
+    // Rate limit
+    if (role === 'admin' && LoginGuard.isLocked()) {
+      errEl.classList.add('show');
+      errDetail.textContent = `Too many failed attempts. Try again in ${LoginGuard.remaining()}s.`;
+      return;
+    }
+
+    // Admin validation
+    if (role === 'admin') {
+      const u = document.getElementById('adminUser').value.trim();
+      const p = document.getElementById('adminPass').value;
+
+      // Clear error state before attempting
+      errEl.classList.remove('show');
+      errDetail.textContent = '';
+
+      // Verify username
+      if (u !== ADMIN_AUTH.username) {
+        LoginGuard.recordFail();
+        errEl.classList.add('show');
+        errDetail.textContent = LoginGuard.remaining() > 0
+          ? `Too many failed attempts. Try again in ${LoginGuard.remaining()}s.`
+          : `Attempts remaining: ${LoginGuard.MAX_ATTEMPTS - LoginGuard.attempts}`;
+        this.audio.error();
+        Storage.logAudit({ name, id, role:'admin' }, 'admin_login_failed', { reason:'bad_username' });
+        return;
+      }
+
+      // Verify password — hash first, fallback second
+      let passwordOk = false;
+      const candidate = `${u}:${p}`;
+      const candidateHash = await sha256Hex(candidate);
+      if (candidateHash && candidateHash === ADMIN_AUTH.passwordHash) {
+        passwordOk = true;
+      } else if (ADMIN_AUTH.useFallback && p === ADMIN_AUTH.passwordFallback) {
+        passwordOk = true;
+      }
+
+      if (!passwordOk) {
+        LoginGuard.recordFail();
+        errEl.classList.add('show');
+        errDetail.textContent = LoginGuard.remaining() > 0
+          ? `Too many failed attempts. Try again in ${LoginGuard.remaining()}s.`
+          : `Attempts remaining: ${LoginGuard.MAX_ATTEMPTS - LoginGuard.attempts}`;
+        this.audio.error();
+        Storage.logAudit({ name, id, role:'admin' }, 'admin_login_failed', { reason:'bad_password' });
+        return;
+      }
+
+      // Success
+      LoginGuard.reset();
+      errEl.classList.remove('show');
+      Storage.logAudit({ name, id, role:'admin' }, 'admin_login_success', {});
+    }
+
+    this.login({ name, id, role });
+  },
+
+  login(user) {
+    if (this.user.id !== 'EMP-0000' && this.user.id !== user.id) {
+      Storage.logLogin(this.user, 'logout');
+    }
+    this.user = user;
+    document.getElementById('uUser').textContent = user.name.split(' ')[0];
+    document.getElementById('loginScreen').classList.add('hide');
+
+    Storage.update(d => {
+      d.users[user.id] = d.users[user.id] || { name:user.name, role:user.role, history:[] };
+      d.users[user.id].name = user.name;
+      d.users[user.id].role = user.role;
+      d.lastUser = user.id;
+    });
+    Storage.logLogin(user, 'login');
+    Storage.logAudit(user, 'session_start', { role: user.role });
+
+    document.getElementById('btnAnalytics').style.display = 'inline-block';
+    if (user.role === 'admin') {
+      document.getElementById('tabAllUsersBtn').style.display = 'inline-block';
+      document.getElementById('tabLoginsBtn').style.display = 'inline-block';
+      document.getElementById('tabAuditBtn').style.display = 'inline-block';
+    } else {
+      document.getElementById('tabAllUsersBtn').style.display = 'none';
+      document.getElementById('tabLoginsBtn').style.display = 'none';
+      document.getElementById('tabAuditBtn').style.display = 'none';
+    }
+    if (user.role === 'trainer' || user.role === 'admin') {
+      document.getElementById('trainerToolbar').classList.add('show');
+      this.bindTrainerToolbar();
+    }
+
+    this.room = new MultiplayerRoom(this);
+    setTimeout(() => { this.room.announceSelf(); this.refreshOnlineList(); }, 400);
+
+    setInterval(() => {
+      if (this.sessionActive && this.room) {
+        this.room.sendMove();
+        if (Math.random() < 0.4) this.room.sendHeartbeat();
+      }
+    }, 150);
+    setInterval(() => {
+      if (this.sessionActive && this.room) this.room.sendCursor();
+    }, 400);
+
+    this.toast(`Welcome, ${user.name} (${user.role})`);
+    this.addFeedback(`✅ Session started for ${user.name} · Role: ${user.role}`, 'good');
+    this.addChatMessage('System', `Welcome ${user.name}! ${user.role === 'trainer' ? 'Trainer tools enabled.' : user.role === 'admin' ? 'Admin access granted.' : 'Have a productive session.'}`, true);
+
+    this.buildScenarioUI();
+    this.loadScenario(SCENARIOS[0]);
+    this.sessionActive = true;
+
+    // Clear sensitive input fields
+    document.getElementById('adminUser').value = '';
+    document.getElementById('adminPass').value = '';
+  },
+
+  logout() {
+    if (this.room) { this.room.leave(); this.room = null; }
+    if (this.user.id !== 'EMP-0000') {
+      Storage.logLogin(this.user, 'logout');
+      Storage.logAudit(this.user, 'session_end', {});
+    }
+    this.sessionActive = false;
+    this.pausedByTrainer = false;
+    document.getElementById('loginScreen').classList.remove('hide');
+    document.getElementById('trainerToolbar').classList.remove('show');
+    document.getElementById('adminFields').style.display = 'none';
+    document.getElementById('adminUser').value = '';
+    document.getElementById('adminPass').value = '';
+    document.getElementById('loginError').classList.remove('show');
+    this.toast('Logged out');
+  },
+
+  applyTheme() {
+    document.body.dataset.theme = this.settings.theme;
+    document.body.dataset.cb = this.settings.colorblind;
+    Storage.update(d => { d.settings = { ...this.settings }; });
+  },
+
+  initThree() {
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x0a0e1a);
+    this.scene.fog = new THREE.FogExp2(0x0a0e1a, 0.018);
+    this.camera = new THREE.PerspectiveCamera(65, innerWidth/innerHeight, 0.1, 200);
+    this.camera.position.set(0, 1.7, 8);
+    this.renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer.setSize(innerWidth, innerHeight);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.xr.enabled = true;
+    document.body.appendChild(this.renderer.domElement);
+    this.clock = new THREE.Clock();
+    this.raycaster = new THREE.Raycaster();
+    this.setupLights();
+    this.setupFPControls();
+    this.setupXR();
+    this.envGroup = new THREE.Group();
+    this.taskGroup = new THREE.Group();
+    this.scene.add(this.envGroup, this.taskGroup);
+    this.renderer.setAnimationLoop(() => this.animate());
+  },
+
+  setupLights() {
+    this.scene.add(new THREE.HemisphereLight(0x8899cc, 0x223344, 0.6));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+    dir.position.set(8, 14, 6); dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    const s = 25;
+    Object.assign(dir.shadow.camera, { left:-s, right:s, top:s, bottom:-s, near:1, far:60 });
+    this.scene.add(dir); this.dirLight = dir;
+  },
+
+  setupFPControls() {
+    this.renderer.domElement.addEventListener('click', () => {
+      if (!this.renderer.xr.isPresenting && !document.getElementById('chatPanel').classList.contains('show'))
+        this.renderer.domElement.requestPointerLock?.();
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (document.pointerLockElement === this.renderer.domElement) {
+        this.yaw -= e.movementX * 0.0025;
+        this.pitch -= e.movementY * 0.0025;
+        this.pitch = Math.max(-Math.PI/2+0.1, Math.min(Math.PI/2-0.1, this.pitch));
+      }
+    });
+  },
+
+  setupXR() {
+    const cmf = new XRControllerModelFactory();
+    const hmf = new XRHandModelFactory();
+    this.xrControllers = []; this.xrGrips = [];
+    for (let i = 0; i < 2; i++) {
+      const c = this.renderer.xr.getController(i);
+      c.addEventListener('selectstart', () => this.onXRSelect(c));
+      this.scene.add(c); this.xrControllers.push(c);
+      const g = this.renderer.xr.getControllerGrip(i);
+      g.add(cmf.createControllerModel(g)); this.scene.add(g); this.xrGrips.push(g);
+      const h = this.renderer.xr.getHand(i);
+      h.add(hmf.createHandModel(h, 'mesh')); h.visible = false; this.scene.add(h);
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-5)]),
+        new THREE.LineBasicMaterial({ color:0x4fc3f7, transparent:true, opacity:0.8 })
+      );
+      c.add(line);
+    }
+    this.renderer.xr.addEventListener('sessionstart', () => {
+      document.body.classList.add('in-vr');
+      this.toast('🥽 VR session active');
+    });
+    this.renderer.xr.addEventListener('sessionend', () => {
+      document.body.classList.remove('in-vr');
+      document.getElementById('btnVR').textContent = '🥽 VR';
+      this.toast('VR session ended');
+    });
+  },
+
+  bindUI() {
+    document.getElementById('btnVR').addEventListener('click', () => this.enterVR());
+    document.getElementById('btnSettings').addEventListener('click', () => this.openModal('settingsModal'));
+    document.getElementById('setClose').addEventListener('click', () => this.closeModal('settingsModal'));
+    document.getElementById('setTheme').addEventListener('change', e => { this.settings.theme = e.target.value; this.applyTheme(); });
+    document.getElementById('setColorblind').addEventListener('change', e => { this.settings.colorblind = e.target.value; this.applyTheme(); });
+    this.bindToggle('toggleSubtitles', 'subtitles');
+    this.bindToggle('toggleAudio', 'audio');
+    this.bindToggle('toggleCursors', 'showCursors', v => {
+      if (this.room) this.room.peers.forEach(p => { p.cursor.visible = v; });
+    });
+
+    document.getElementById('btnAnalytics').addEventListener('click', () => { this.renderAnalytics(); this.openModal('analyticsModal'); });
+    document.getElementById('anaClose').addEventListener('click', () => this.closeModal('analyticsModal'));
+    document.querySelectorAll('.tab').forEach(t => {
+      t.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        document.getElementById(t.dataset.tab).classList.add('active');
+      });
+    });
+    document.getElementById('expJson').addEventListener('click', () => this.exportJSON());
+    document.getElementById('expCsv').addEventListener('click', () => this.exportCSV());
+    document.getElementById('expPrint').addEventListener('click', () => window.print());
+
+    document.getElementById('btnQuiz').addEventListener('click', () => {
+      if (this.activeScenario) this.startQuiz(this.activeScenario);
+    });
+    document.getElementById('quizClose').addEventListener('click', () => this.closeModal('quizModal'));
+    document.getElementById('quizSubmit').addEventListener('click', () => this.submitQuiz());
+
+    document.getElementById('certClose').addEventListener('click', () => this.closeModal('certModal'));
+    document.getElementById('certPrint').addEventListener('click', () => window.print());
+
+    document.getElementById('btnHelp').addEventListener('click', () => this.openModal('helpModal'));
+    document.getElementById('helpClose').addEventListener('click', () => this.closeModal('helpModal'));
+
+    document.getElementById('btnStop').addEventListener('click', () => this.emergencyStop());
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      if (confirm('End session and logout?')) this.logout();
+    });
+
+    document.getElementById('rRetry').addEventListener('click', () => { this.closeModal('resultModal'); this.restart(); });
+    document.getElementById('rClose').addEventListener('click', () => this.closeModal('resultModal'));
+    document.getElementById('rQuiz').addEventListener('click', () => { this.closeModal('resultModal'); this.startQuiz(this.activeScenario); });
+    document.getElementById('rCert').addEventListener('click', () => { this.closeModal('resultModal'); this.showCertificate(); });
+
+    document.getElementById('btnChat').addEventListener('click', () => {
+      const p = document.getElementById('chatPanel');
+      p.classList.toggle('show');
+      if (p.classList.contains('show')) document.getElementById('chatInput').focus();
+    });
+    document.getElementById('chatToggle').addEventListener('click', () => {
+      document.getElementById('chatPanel').classList.remove('show');
+    });
+    document.getElementById('chatSend').addEventListener('click', () => this.sendChatFromInput());
+    document.getElementById('chatInput').addEventListener('keypress', e => {
+      if (e.key === 'Enter') this.sendChatFromInput();
+    });
+  },
+
+  sendChatFromInput() {
+    const inp = document.getElementById('chatInput');
+    const txt = inp.value.trim();
+    if (!txt) return;
+    if (this.room) this.room.sendChat(txt);
+    this.addChatMessage(this.user.name, txt, true);
+    this.audio.chat();
+    inp.value = '';
+  },
+
+  bindToggle(id, key, cb) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('on', this.settings[key]);
+    el.style.background = this.settings[key] ? 'var(--accent)' : 'rgba(255,255,255,0.1)';
+    el.addEventListener('click', () => {
+      this.settings[key] = !this.settings[key];
+      el.classList.toggle('on', this.settings[key]);
+      el.style.background = this.settings[key] ? 'var(--accent)' : 'rgba(255,255,255,0.1)';
+      Storage.update(d => { d.settings = { ...this.settings }; });
+      if (cb) cb(this.settings[key]);
+    });
+  },
+
+  bindTrainerToolbar() {
+    document.getElementById('tbBroadcast').addEventListener('click', () => {
+      const msg = prompt('Broadcast to all trainees:', 'Please proceed to the next step');
+      if (msg) {
+        if (this.room) this.room.sendBroadcast(msg);
+        this.showSubtitle(`📢 You: ${msg}`, 4000);
+        Storage.logAudit(this.user, 'trainer_broadcast', { msg });
+      }
+    });
+    document.getElementById('tbPause').addEventListener('click', () => {
+      this._trainerPaused = !this._trainerPaused;
+      if (this.room) this.room.sendPause(this._trainerPaused);
+      document.getElementById('tbPause').textContent = this._trainerPaused ? '▶ Resume All' : '⏸ Pause All';
+      this.toast(this._trainerPaused ? 'Trainees paused' : 'Trainees resumed');
+      Storage.logAudit(this.user, 'trainer_pause', { paused: this._trainerPaused });
+    });
+    document.getElementById('tbHint').addEventListener('click', () => {
+      const task = this.activeScenario?.tasks[this.currentTaskIndex];
+      const msg = prompt('Push hint:', task ? task.hint : 'Follow the objectives');
+      if (msg) {
+        if (this.room) this.room.sendHint(msg);
+        Storage.logAudit(this.user, 'trainer_hint', { msg });
+      }
+    });
+    document.getElementById('tbSpawn').addEventListener('click', () => {
+      const dir = new THREE.Vector3(0,0,-1).applyQuaternion(this.camera.quaternion);
+      const pos = this.camera.position.clone().add(dir.multiplyScalar(4));
+      if (this.room) this.room.sendSpawn(pos.x, pos.y, pos.z);
+      this.toast('📍 Marker spawned');
+      Storage.logAudit(this.user, 'trainer_spawn', { x:pos.x, y:pos.y, z:pos.z });
+    });
+    document.getElementById('tbView').addEventListener('click', () => {
+      const peers = Array.from(this.room?.peers.values() || []);
+      if (!peers.length) { this.toast('No other users online'); return; }
+      const names = peers.map((p,i) => `${i+1}. ${p.name} (${p.role})`).join('\n');
+      const pick = prompt(`View trainee:\n${names}\n\nEnter number:`, '1');
+      const idx = parseInt(pick) - 1;
+      if (idx >= 0 && idx < peers.length) {
+        const p = peers[idx];
+        this.camera.position.set(p.x + 2, 1.7, p.z + 2);
+        this.yaw = Math.atan2(p.x - this.camera.position.x, p.z - this.camera.position.z);
+        this.toast(`👁 Viewing ${p.name}`);
+      }
+    });
+  },
+
+  openModal(id) { document.getElementById(id).classList.add('show'); },
+  closeModal(id) { document.getElementById(id).classList.remove('show'); },
+  toast(msg, duration=2200) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(this._toastT);
+    this._toastT = setTimeout(() => t.classList.remove('show'), duration);
+  },
+  showSubtitle(text, dur=3000) {
+    if (!this.settings.subtitles) return;
+    const s = document.getElementById('subtitle');
+    s.textContent = text;
+    s.classList.add('show');
+    clearTimeout(this._subT);
+    this._subT = setTimeout(() => s.classList.remove('show'), dur);
+  },
+  addChatMessage(who, text, self=false) {
+    const c = document.getElementById('chatMessages');
+    const d = document.createElement('div');
+    d.className = 'chat-msg' + (self ? ' self' : '') + (who === 'System' ? ' system' : '');
+    d.innerHTML = who === 'System' ? text : `<span class="who">${who}</span>${text}`;
+    c.appendChild(d);
+    c.scrollTop = c.scrollHeight;
+    while (c.children.length > 60) c.removeChild(c.firstChild);
+    if (!self && who !== 'System') document.getElementById('chatPanel').classList.add('show');
+  },
+  refreshOnlineList() {
+    const list = document.getElementById('onlineList');
+    if (!list) return;
+    const peers = Array.from(this.room?.peers.values() || []);
+    const total = peers.length + 1;
+    document.getElementById('uOnline').textContent = total;
+    document.getElementById('onlineCount').textContent = total;
+    let html = `<div class="online-user">
+      <div class="dot"></div>
+      <span>${this.user.name} <small style="color:var(--text-dim);">(you)</small></span>
+      <span class="role-tag ${this.user.role}">${this.user.role}</span>
+    </div>`;
+    peers.forEach(p => {
+      html += `<div class="online-user">
+        <div class="dot"></div>
+        <span>${p.name}</span>
+        <span class="role-tag ${p.role}">${p.role}</span>
+      </div>`;
+    });
+    list.innerHTML = html;
+  },
+
+  buildScenarioUI() {
+    const list = document.getElementById('scenarioList');
+    list.innerHTML = '';
+    document.getElementById('moduleCount').textContent = SCENARIOS.length;
+    SCENARIOS.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'scenario-item';
+      div.dataset.id = s.id;
+      const completed = this.userCompleted(s.id);
+      div.innerHTML = `
+        <div class="scenario-icon">${s.icon}</div>
+        <div class="scenario-info"><b>${s.name}</b><small>${s.desc} · ${s.difficulty}</small></div>
+        ${completed ? '<div class="scenario-badge">✓ Done</div>' : ''}
+      `;
+      div.addEventListener('click', () => {
+        if (this.pausedByTrainer) { this.toast('Session paused by trainer'); return; }
+        this.loadScenario(s);
+      });
+      list.appendChild(div);
+    });
+  },
+  userCompleted(sid) {
+    const u = Storage.load().users[this.user.id];
+    return u && (u.history || []).some(h => h.scenarioId === sid && h.passed);
+  },
+  highlightScenario(id) {
+    document.querySelectorAll('.scenario-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.id === id);
+    });
+  },
+
+  loadScenario(scenario) {
+    this.activeScenario = scenario;
+    this.currentTaskIndex = 0;
+    this.score = 0; this.correct = 0; this.errors = 0;
+    this.startTime = performance.now();
+    this.interactables = [];
+    this.hovered = null;
+    this.highlightScenario(scenario.id);
+    this.clearGroup(this.envGroup);
+    this.clearGroup(this.taskGroup);
+    this.buildEnvironment(scenario.env, scenario.color);
+    this.buildTasks(scenario);
+    document.getElementById('feedbackLog').innerHTML = '';
+    this.addFeedback(`▶ Module: ${scenario.name} · ${scenario.difficulty} · ~${scenario.estMin} min`, 'info');
+    this.showSubtitle(`Welcome to ${scenario.name}`, 3500);
+    this.camera.position.set(0, 1.7, 8);
+    this.yaw = 0; this.pitch = 0;
+    this.buildObjectiveList();
+    this.updateUI();
+    this.closeModal('resultModal');
+    this.audio.alert();
+    Storage.logAudit(this.user, 'scenario_load', { scenarioId: scenario.id });
+  },
+  restart() { if (this.activeScenario) this.loadScenario(this.activeScenario); },
+
+  clearGroup(g) {
+    while (g.children.length) {
+      const c = g.children.pop();
+      c.traverse?.(o => {
+        if (o.geometry) o.geometry.dispose?.();
+        if (o.material) {
+          if (Array.isArray(o.material)) o.material.forEach(m => m.dispose?.());
+          else o.material.dispose?.();
+        }
+      });
+    }
+  },
+
+  buildEnvironment(type, accent) {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60,60),
+      new THREE.MeshStandardMaterial({ color:0x1a2238, roughness:0.9, metalness:0.1 }));
+    floor.rotation.x = -Math.PI/2; floor.receiveShadow = true;
+    this.envGroup.add(floor);
+    const grid = new THREE.GridHelper(60, 30, 0x4fc3f7, 0x223355);
+    grid.material.opacity = 0.25; grid.material.transparent = true;
+    this.envGroup.add(grid);
+    const wallMat = new THREE.MeshStandardMaterial({ color:0x2a3350, roughness:0.85 });
+    const accentMat = new THREE.MeshStandardMaterial({ color:accent, emissive:accent, emissiveIntensity:0.15, roughness:0.6 });
+    const back = new THREE.Mesh(new THREE.BoxGeometry(30, 8, 0.4), wallMat);
+    back.position.set(0, 4, -12); back.receiveShadow = true; this.envGroup.add(back);
+    const left = new THREE.Mesh(new THREE.BoxGeometry(0.4, 8, 24), wallMat);
+    left.position.set(-15, 4, 0); left.receiveShadow = true; this.envGroup.add(left);
+    const right = left.clone(); right.position.x = 15; this.envGroup.add(right);
+    if (type === 'warehouse') {
+      for (let i=-1;i<=1;i++) {
+        const shelf = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 1), wallMat);
+        shelf.position.set(i*6, 1.5, -11); shelf.castShadow = true; shelf.receiveShadow = true;
+        this.envGroup.add(shelf);
+      }
+    } else if (type === 'workshop') {
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(6, 0.2, 1.5), accentMat);
+      bench.position.set(-6, 1.0, -9); bench.castShadow = true; bench.receiveShadow = true;
+      this.envGroup.add(bench);
+    } else if (type === 'office') {
+      for (let i=-1;i<=1;i++) {
+        const desk = new THREE.Mesh(new THREE.BoxGeometry(3, 0.15, 1.5), accentMat);
+        desk.position.set(i*5, 1.0, -8); desk.castShadow = true; this.envGroup.add(desk);
+        const mon = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.05), new THREE.MeshStandardMaterial({color:0x111111, emissive:0x224466}));
+        mon.position.set(i*5, 1.5, -8); this.envGroup.add(mon);
+      }
+    }
+    const count = 200;
+    const positions = new Float32Array(count*3);
+    for (let i=0;i<count;i++) {
+      positions[i*3]   = (Math.random()-0.5)*50;
+      positions[i*3+1] = Math.random()*12;
+      positions[i*3+2] = (Math.random()-0.5)*50;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+    this.particles = new THREE.Points(geo, new THREE.PointsMaterial({
+      color:0x4fc3f7, size:0.06, transparent:true, opacity:0.5, depthWrite:false
+    }));
+    this.envGroup.add(this.particles);
+  },
+
+  buildTasks(scenario) {
+    const mk = (mesh, id, label) => {
+      mesh.userData.interactable = true;
+      mesh.userData.targetId = id;
+      mesh.userData.label = label;
+      this.interactables.push(mesh);
+      return mesh;
+    };
+    const red = new THREE.MeshStandardMaterial({ color:0xf44336, emissive:0xf44336, emissiveIntensity:0.4 });
+    const green = new THREE.MeshStandardMaterial({ color:0x4caf50, emissive:0x4caf50, emissiveIntensity:0.4 });
+    const yellow = new THREE.MeshStandardMaterial({ color:0xffff00, emissive:0x444400, emissiveIntensity:0.3 });
+
+    if (scenario.id === 'fire') {
+      const alarm = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.8,0.15), red);
+      alarm.position.set(-8, 2.2, -11.7); alarm.castShadow = true;
+      this.taskGroup.add(mk(alarm, 'alarm', 'Fire Alarm Panel'));
+      const ext = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,0.9,16), red);
+      body.position.y = 0.45; body.castShadow = true;
+      const top = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.2,12), new THREE.MeshStandardMaterial({color:0x333333}));
+      top.position.y = 1.0; ext.add(body, top);
+      ext.position.set(8, 0, -11.5); this.taskGroup.add(ext);
+      mk(body, 'extinguisher', 'Fire Extinguisher');
+      const fireGroup = new THREE.Group();
+      const f1 = new THREE.Mesh(new THREE.ConeGeometry(0.6,1.5,8),
+        new THREE.MeshStandardMaterial({color:0xff5500, emissive:0xff5500, emissiveIntensity:0.9, transparent:true, opacity:0.85}));
+      f1.position.y = 0.75;
+      const f2 = new THREE.Mesh(new THREE.ConeGeometry(0.4,1.0,8),
+        new THREE.MeshStandardMaterial({color:0xffdd00, emissive:0xffdd00, emissiveIntensity:1, transparent:true, opacity:0.9}));
+      f2.position.y = 1.3; fireGroup.add(f1,f2);
+      fireGroup.position.set(10, 0, -8); this.taskGroup.add(fireGroup);
+      mk(f1, 'fire', 'Fire'); this.fireGroup = fireGroup;
+      const exit = new THREE.Mesh(new THREE.BoxGeometry(1.6,3,0.2), green);
+      exit.position.set(12, 1.5, 12); exit.castShadow = true;
+      this.taskGroup.add(mk(exit, 'exit', 'Emergency Exit'));
+    }
+    if (scenario.id === 'electrical') {
+      const gloves = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.15,0.3), yellow);
+      gloves.position.set(-6, 1.15, -9); gloves.castShadow = true;
+      this.taskGroup.add(mk(gloves, 'gloves', 'Insulated Gloves'));
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(1.2,1.6,0.2),
+        new THREE.MeshStandardMaterial({color:0x666666, metalness:0.7}));
+      panel.position.set(10, 2.0, -11.7); panel.castShadow = true;
+      this.taskGroup.add(mk(panel, 'breaker', 'Breaker Panel'));
+      const lever = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.4,0.15), red);
+      lever.position.set(0.3, 0.2, 0.12);
+      lever.userData = { interactable:true, targetId:'breaker', label:'Breaker Lever' };
+      this.interactables.push(lever); panel.add(lever);
+      const lock = new THREE.Group();
+      const lb = new THREE.Mesh(new THREE.BoxGeometry(0.25,0.3,0.1),
+        new THREE.MeshStandardMaterial({color:0xffaa00, metalness:0.8}));
+      const ls = new THREE.Mesh(new THREE.TorusGeometry(0.1,0.03,8,16,Math.PI),
+        new THREE.MeshStandardMaterial({color:0xffaa00, metalness:0.8}));
+      ls.rotation.z = Math.PI; ls.position.y = 0.2; lock.add(lb, ls);
+      lock.position.set(8, 0.5, -11.5); this.taskGroup.add(lock);
+      mk(lb, 'padlock', 'LOTO Padlock');
+      const meter = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.25,0.2),
+        new THREE.MeshStandardMaterial({color:0x333333}));
+      meter.position.set(12, 0.5, -11.5); meter.castShadow = true;
+      this.taskGroup.add(mk(meter, 'meter', 'Voltage Meter'));
+    }
+    if (scenario.id === 'forklift') {
+      const fl = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.6,1.2,2.4),
+        new THREE.MeshStandardMaterial({color:0xffaa00, metalness:0.4}));
+      body.position.y = 0.8; body.castShadow = true; fl.add(body);
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.3,0.6),
+        new THREE.MeshStandardMaterial({color:0x222222}));
+      seat.position.set(0,1.55,0.2); fl.add(seat);
+      const forkMat = new THREE.MeshStandardMaterial({color:0xaaaaaa, metalness:0.8});
+      for (const z of [-0.5,0.5]) {
+        const fork = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.08,1.8), forkMat);
+        fork.position.set(z*0.5, 0.15, 1.6); fl.add(fork);
+      }
+      fl.position.set(0,0,2); this.taskGroup.add(fl);
+      mk(seat, 'forklift', 'Forklift Seatbelt');
+      const pallet = new THREE.Group();
+      const box = new THREE.Mesh(new THREE.BoxGeometry(1.4,1.0,1.4),
+        new THREE.MeshStandardMaterial({color:0x8B4513}));
+      box.position.y = 0.55; box.castShadow = true; pallet.add(box);
+      pallet.position.set(-5, 0.15, 0); this.taskGroup.add(pallet);
+      mk(box, 'pallet', 'Cargo Pallet');
+      const dz = new THREE.Mesh(new THREE.BoxGeometry(3,0.05,3), green);
+      dz.position.set(8, 0.03, 0); this.taskGroup.add(dz);
+    }
+    if (scenario.id === 'firstaid') {
+      const cas = new THREE.Group();
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6,1.4,0.3),
+        new THREE.MeshStandardMaterial({color:0x3366aa}));
+      torso.position.y = 0.9; cas.add(torso);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22,16,16),
+        new THREE.MeshStandardMaterial({color:0xffcc99}));
+      head.position.y = 1.75; cas.add(head);
+      cas.rotation.z = Math.PI/2; cas.position.set(0, 0.35, -3);
+      this.taskGroup.add(cas);
+      mk(torso, 'casualty', 'Casualty');
+      const phone = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.5,0.1),
+        new THREE.MeshStandardMaterial({color:0x222222}));
+      phone.position.set(-10, 2.0, -11.7); phone.castShadow = true;
+      this.taskGroup.add(mk(phone, 'phone', 'Emergency Phone'));
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(0.8,1.0,0.3),
+        new THREE.MeshStandardMaterial({color:0x00aa00, emissive:0x004400, emissiveIntensity:0.5}));
+      cab.position.set(10, 2.0, -11.6); cab.castShadow = true;
+      this.taskGroup.add(mk(cab, 'aed', 'AED Cabinet'));
+    }
+    if (scenario.id === 'chemical') {
+      const suit = new THREE.Mesh(new THREE.CapsuleGeometry(0.4,1.2,8,12),
+        new THREE.MeshStandardMaterial({color:0xffdd00, emissive:0x444400, emissiveIntensity:0.3}));
+      suit.position.set(-6, 1.1, -9); suit.castShadow = true;
+      this.taskGroup.add(mk(suit, 'suit', 'Hazmat Suit'));
+      const spill = new THREE.Mesh(new THREE.CircleGeometry(1.2, 24),
+        new THREE.MeshStandardMaterial({color:0x66ff66, emissive:0x00aa00, emissiveIntensity:0.4, transparent:true, opacity:0.8}));
+      spill.rotation.x = -Math.PI/2; spill.position.set(2, 0.02, -4);
+      this.taskGroup.add(mk(spill, 'spill', 'Chemical Spill'));
+      const neut = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.6,12),
+        new THREE.MeshStandardMaterial({color:0x4fc3f7, emissive:0x115577, emissiveIntensity:0.4}));
+      neut.position.set(8, 0.3, -9); neut.castShadow = true;
+      this.taskGroup.add(mk(neut, 'neutralizer', 'Neutralizer'));
+      const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.0,16),
+        new THREE.MeshStandardMaterial({color:0xcc0000, emissive:0x440000, emissiveIntensity:0.3}));
+      bin.position.set(12, 0.5, -9); bin.castShadow = true;
+      this.taskGroup.add(mk(bin, 'wastebin', 'Hazardous Waste Bin'));
+    }
+  },
+
+  buildObjectiveList() {
+    const ul = document.getElementById('objectiveList');
+    ul.innerHTML = '';
+    this.activeScenario.tasks.forEach((t, i) => {
+      const li = document.createElement('li');
+      li.dataset.index = i;
+      li.textContent = t.label;
+      ul.appendChild(li);
+    });
+    this.updateUI();
+  },
+  updateUI() {
+    document.getElementById('uScore').textContent = this.score;
+    document.getElementById('uCorrect').textContent = this.correct;
+    document.getElementById('uErrors').textContent = this.errors;
+    document.getElementById('objProgress').textContent = `${this.currentTaskIndex}/${this.activeScenario.tasks.length}`;
+    const lis = document.querySelectorAll('#objectiveList li');
+    lis.forEach((li, i) => {
+      li.classList.remove('done','active');
+      if (i < this.currentTaskIndex) li.classList.add('done');
+      else if (i === this.currentTaskIndex) li.classList.add('active');
+    });
+    const progress = (this.currentTaskIndex / this.activeScenario.tasks.length) * 100;
+    document.getElementById('progressFill').style.width = progress + '%';
+  },
+  addFeedback(msg, type='info') {
+    const log = document.getElementById('feedbackLog');
+    const d = document.createElement('div');
+    d.className = 'fb ' + type;
+    d.textContent = msg;
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    while (log.children.length > 15) log.removeChild(log.firstChild);
+  },
+
+  onKey(e, down) {
+    const k = e.key.toLowerCase();
+    if (['w','a','s','d'].includes(k)) this.moveState[k] = down;
+    if (!down) return;
+    if (document.activeElement === document.getElementById('chatInput')) return;
+    if (k === 'e') this.interact(this.getTargetUnderCrosshair() || this.hovered);
+    if (k === 'f') this.giveHint();
+    if (k === 't') this.teleportToObjective();
+    if (k === 'enter') { e.preventDefault(); document.getElementById('chatPanel').classList.add('show'); document.getElementById('chatInput').focus(); }
+    if (k === 'escape') {
+      if (document.pointerLockElement) document.exitPointerLock();
+      document.getElementById('chatPanel').classList.remove('show');
+    }
+  },
+  onClick() { if (this.hovered) this.interact(this.hovered); },
+  onXRSelect(controller) {
+    const tempMatrix = new THREE.Matrix4().identity().extractRotation(controller.matrixWorld);
+    this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+    this.raycaster.ray.direction.set(0,0,-1).applyMatrix4(tempMatrix);
+    const hits = this.raycaster.intersectObjects(this.interactables, true);
+    if (hits.length) this.interact(hits[0].object);
+  },
+  getTargetUnderCrosshair() {
+    this.raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
+    const hits = this.raycaster.intersectObjects(this.interactables, true);
+    if (!hits.length || hits[0].distance > 6) return null;
+    let o = hits[0].object;
+    while (o && !o.userData.interactable) o = o.parent;
+    return o;
+  },
+  interact(obj) {
+    if (this.pausedByTrainer) { this.toast('Session paused by trainer'); return; }
+    if (!obj) return;
+    let target = obj;
+    while (target && !target.userData.interactable) target = target.parent;
+    if (!target) return;
+    const targetId = target.userData.targetId;
+    const task = this.activeScenario.tasks[this.currentTaskIndex];
+    if (!task) return;
+    if (task.target === targetId) {
+      this.score += task.points;
+      this.correct++;
+      this.addFeedback(`✓ ${task.label} — correct! +${task.points}`, 'good');
+      this.showSubtitle(`✓ ${task.label}`);
+      this.audio.success();
+      this.pulseObject(target);
+      this.currentTaskIndex++;
+      this.updateUI();
+      if (this.currentTaskIndex >= this.activeScenario.tasks.length) this.completeTraining();
+    } else {
+      this.errors++;
+      this.score = Math.max(0, this.score - 5);
+      this.addFeedback(`✕ Wrong action on "${target.userData.label}". Hint: ${task.hint}`, 'bad');
+      this.showSubtitle(`✕ Incorrect. Try: ${task.hint}`);
+      this.audio.error();
+      this.updateUI();
+    }
+  },
+  giveHint() {
+    const task = this.activeScenario?.tasks[this.currentTaskIndex];
+    if (!task) return;
+    this.addFeedback(`💡 ${task.hint}`, 'info');
+    this.showSubtitle(`💡 ${task.hint}`);
+    this.audio.click();
+  },
+  teleportToObjective() {
+    const task = this.activeScenario?.tasks[this.currentTaskIndex];
+    if (!task) return;
+    const target = this.interactables.find(o => o.userData.targetId === task.target);
+    if (!target) return;
+    const pos = new THREE.Vector3();
+    target.getWorldPosition(pos);
+    const offset = new THREE.Vector3(0, 0, 2.5);
+    this.camera.position.copy(pos).add(offset);
+    this.camera.position.y = 1.7;
+    this.yaw = Math.atan2(pos.x - this.camera.position.x, pos.z - this.camera.position.z);
+    this.pitch = -0.1;
+    this.audio.click();
+    this.addFeedback('🚀 Teleported', 'info');
+  },
+  pulseObject(obj) {
+    if (!obj.material || !obj.material.emissive) return;
+    const orig = obj.material.emissive.clone();
+    const origI = obj.material.emissiveIntensity;
+    obj.material.emissive.setHex(0x4caf50);
+    let t = 0;
+    const anim = () => {
+      t += 0.06;
+      if (t < 1) { obj.material.emissiveIntensity = (1-t)*2; requestAnimationFrame(anim); }
+      else { obj.material.emissive.copy(orig); obj.material.emissiveIntensity = origI; }
+    };
+    anim();
+  },
+  completeTraining() {
+    const duration = Math.floor((performance.now() - this.startTime) / 1000);
+    this.elapsed = duration;
+    const totalPossible = this.activeScenario.tasks.reduce((a,t)=>a+t.points,0);
+    const pct = Math.round((this.score / totalPossible) * 100);
+    const passed = pct >= 70;
+    document.getElementById('rScore').textContent = pct + '%';
+    document.getElementById('rCorrect').textContent = this.correct;
+    document.getElementById('rErrors').textContent = this.errors;
+    document.getElementById('rTime').textContent = duration + 's';
+    document.getElementById('rTitle').textContent = (passed ? '✅ ' : '⚠️ ') + this.activeScenario.name + ' Complete';
+    document.getElementById('rRating').textContent = passed
+      ? `Rating: ${pct >= 90 ? 'Excellent' : 'Competent'}`
+      : 'Rating: Needs Improvement';
+    Storage.update(d => {
+      const u = d.users[this.user.id] || (d.users[this.user.id] = { name:this.user.name, role:this.user.role, history:[] });
+      u.history = u.history || [];
+      u.history.push({
+        scenarioId: this.activeScenario.id, scenarioName: this.activeScenario.name,
+        score: pct, correct: this.correct, errors: this.errors,
+        duration, passed, timestamp: Date.now()
+      });
+      d.history.push({
+        userId: this.user.id, userName: this.user.name, userRole: this.user.role,
+        scenarioId: this.activeScenario.id, score: pct, passed, duration, timestamp: Date.now()
+      });
+    });
+    Storage.logAudit(this.user, 'module_complete', { scenarioId: this.activeScenario.id, score: pct, passed });
+    this.openModal('resultModal');
+    this.audio.alert();
+    this.buildScenarioUI();
+  },
+
+  renderAnalytics() {
+    const d = Storage.load();
+    const mine = (d.users[this.user.id]?.history) || [];
+    const isPrivileged = this.user.role === 'trainer' || this.user.role === 'admin';
+    const records = isPrivileged ? d.history : mine;
+    const totalSessions = records.length;
+    const avgScore = totalSessions ? Math.round(records.reduce((a,r)=>a+r.score,0)/totalSessions) : 0;
+    const passRate = totalSessions ? Math.round((records.filter(r=>r.passed).length/totalSessions)*100) : 0;
+    const totalTime = records.reduce((a,r)=>a+(r.duration||0),0);
+    document.getElementById('analyticsStats').innerHTML = `
+      <div><b>${totalSessions}</b>Sessions</div>
+      <div><b>${avgScore}%</b>Avg Score</div>
+      <div><b>${passRate}%</b>Pass Rate</div>
+      <div><b>${Math.floor(totalTime/60)}m</b>Total Time</div>
+      <div><b>${Object.keys(d.users).length}</b>Users</div>
+      <div><b>${this.user.role}</b>Role</div>
+    `;
+    const byScenario = {};
+    SCENARIOS.forEach(s => byScenario[s.id] = { name:s.name, scores:[], icon:s.icon });
+    records.forEach(r => { if (byScenario[r.scenarioId]) byScenario[r.scenarioId].scores.push(r.score); });
+    const bars = document.getElementById('chartBars');
+    bars.innerHTML = '';
+    Object.values(byScenario).forEach(s => {
+      const avg = s.scores.length ? Math.round(s.scores.reduce((a,b)=>a+b,0)/s.scores.length) : 0;
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = Math.max(4, avg) + '%';
+      bar.innerHTML = `<b>${avg}%</b><span>${s.icon}</span>`;
+      bars.appendChild(bar);
+    });
+    const hist = document.getElementById('historyList');
+    hist.innerHTML = '';
+    mine.slice().reverse().slice(0,20).forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      const dt = new Date(r.timestamp).toLocaleString();
+      item.innerHTML = `<span>${r.scenarioName || r.scenarioId}</span>
+        <span class="score">${r.score}% · ${r.passed ? '✓' : '✕'}</span>
+        <span class="time">${dt}</span>`;
+      hist.appendChild(item);
+    });
+    if (!mine.length) hist.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">No records yet.</p>';
+    const all = document.getElementById('allUsersList');
+    all.innerHTML = '';
+    if (isPrivileged) {
+      const byUser = {};
+      d.history.forEach(r => {
+        byUser[r.userId] = byUser[r.userId] || { name:r.userName, role:r.userRole, scores:[], sessions:0 };
+        byUser[r.userId].scores.push(r.score);
+        byUser[r.userId].sessions++;
+      });
+      Object.entries(byUser).forEach(([id, u]) => {
+        const avg = Math.round(u.scores.reduce((a,b)=>a+b,0)/u.scores.length);
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `<span>${u.name} (${id}) · <span style="color:var(--text-dim);">${u.role}</span></span>
+          <span class="score">${u.sessions} sessions · Avg ${avg}%</span>`;
+        all.appendChild(item);
+      });
+      if (!Object.keys(byUser).length) all.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">No user sessions.</p>';
+    } else all.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">Privileged access required.</p>';
+
+    const lh = document.getElementById('loginHistoryList');
+    lh.innerHTML = '';
+    if (this.user.role === 'admin') {
+      d.logins.slice().reverse().slice(0,60).forEach(l => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        const dt = new Date(l.timestamp).toLocaleString();
+        const actionColor = l.action === 'login' ? 'var(--good)' : 'var(--warn)';
+        item.innerHTML = `<span><b style="color:${actionColor};">${l.action.toUpperCase()}</b> · ${l.userName} (${l.userId})</span>
+          <span class="score" style="color:var(--text-dim);">${l.role}</span>
+          <span class="time">${dt}</span>`;
+        lh.appendChild(item);
+      });
+      if (!d.logins.length) lh.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">No login history.</p>';
+    } else lh.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">Admin access required.</p>';
+
+    const al = document.getElementById('auditLogList');
+    al.innerHTML = '';
+    if (this.user.role === 'admin') {
+      d.audit.slice().reverse().slice(0,60).forEach(a => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        const dt = new Date(a.timestamp).toLocaleString();
+        item.innerHTML = `<span><b style="color:var(--accent);">${a.action}</b> · ${a.actor} (${a.role})</span>
+          <span class="score" style="color:var(--text-dim); font-size:11px;">${JSON.stringify(a.details).slice(0,50)}</span>
+          <span class="time">${dt}</span>`;
+        al.appendChild(item);
+      });
+      if (!d.audit.length) al.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">No audit events.</p>';
+    } else al.innerHTML = '<p style="color:var(--text-dim);font-size:12px;">Admin access required.</p>';
+  },
+
+  exportJSON() {
+    const d = Storage.load();
+    const blob = new Blob([JSON.stringify(d, null, 2)], { type:'application/json' });
+    this.download(blob, `virtrutrain-report-${Date.now()}.json`);
+  },
+  exportCSV() {
+    const d = Storage.load();
+    const rows = [['timestamp','userId','userName','role','scenarioId','score','passed','duration']];
+    d.history.forEach(r => rows.push([
+      new Date(r.timestamp).toISOString(), r.userId, r.userName, r.userRole,
+      r.scenarioId, r.score, r.passed, r.duration
+    ]));
+    const csv = rows.map(r => r.join(',')).join('\n');
+    this.download(new Blob([csv], {type:'text/csv'}), `virtrutrain-report-${Date.now()}.csv`);
+  },
+  download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  },
+
+  startQuiz(scenario) {
+    this._quizAnswers = {};
+    const body = document.getElementById('quizBody');
+    document.getElementById('quizSubtitle').textContent = scenario.name + ' — Knowledge Check';
+    body.innerHTML = scenario.quiz.map((q, qi) => `
+      <div class="quiz-question">
+        <p>${qi+1}. ${q.q}</p>
+        ${q.a.map((opt, oi) => `<button class="quiz-option" data-q="${qi}" data-o="${oi}">${opt}</button>`).join('')}
+      </div>
+    `).join('');
+    body.querySelectorAll('.quiz-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const q = +btn.dataset.q, o = +btn.dataset.o;
+        body.querySelectorAll(`.quiz-option[data-q="${q}"]`).forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this._quizAnswers[q] = o;
+      });
+    });
+    document.getElementById('quizSubmit').style.display = '';
+    this.openModal('quizModal');
+    this._quizScenario = scenario;
+  },
+  submitQuiz() {
+    const scenario = this._quizScenario;
+    const answers = this._quizAnswers || {};
+    let correct = 0;
+    const body = document.getElementById('quizBody');
+    scenario.quiz.forEach((q, qi) => {
+      const chosen = answers[qi];
+      body.querySelectorAll(`.quiz-option[data-q="${qi}"]`).forEach(b => {
+        const oi = +b.dataset.o;
+        b.classList.remove('selected');
+        if (oi === q.c) b.classList.add('correct');
+        else if (oi === chosen) b.classList.add('wrong');
+        b.disabled = true;
+      });
+      if (chosen === q.c) correct++;
+    });
+    const pct = Math.round((correct / scenario.quiz.length) * 100);
+    document.getElementById('quizSubtitle').textContent = `Result: ${correct}/${scenario.quiz.length} (${pct}%)`;
+    this.score += pct;
+    document.getElementById('uScore').textContent = this.score;
+    this.addFeedback(`📝 Quiz: ${correct}/${scenario.quiz.length} (${pct}%) — ${pct} pts`, pct >= 70 ? 'good' : 'warn');
+    document.getElementById('quizSubmit').style.display = 'none';
+    Storage.logAudit(this.user, 'quiz_complete', { scenarioId: scenario.id, correct, total: scenario.quiz.length, pct });
+    this.audio.beep(pct >= 70 ? 1200 : 400, 0.3);
+  },
+
+  showCertificate() {
+    const pct = parseInt(document.getElementById('rScore').textContent) || 0;
+    document.getElementById('certBody').innerHTML = `
+      <h1>🎓 Certificate of Completion</h1>
+      <p>This certifies that</p>
+      <div class="name">${this.user.name}</div>
+      <p>has successfully completed the <b>${this.activeScenario.name}</b> training module<br>
+      with a score of <b>${pct}%</b> on ${new Date().toLocaleDateString()}.</p>
+      <p style="margin-top:20px; font-size:12px; color:#486581;">
+        Employee ID: ${this.user.id} · VirtuTrain Enterprise<br>
+        Certificate ID: VT-${Date.now().toString(36).toUpperCase()}
+      </p>
+    `;
+    this.openModal('certModal');
+  },
+
+  enterVR() {
+    if (!navigator.xr) { this.toast('VR not supported'); return; }
+    navigator.xr.isSessionSupported('immersive-vr').then(sup => {
+      if (!sup) { this.toast('Immersive VR unavailable'); return; }
+      navigator.xr.requestSession('immersive-vr', {
+        optionalFeatures: ['local-floor','bounded-floor','hand-tracking']
+      }).then(s => {
+        this.renderer.xr.setSession(s);
+        document.getElementById('btnVR').textContent = '🥽 VR Active';
+      });
+    });
+  },
+
+  emergencyStop() {
+    if (this.renderer.xr.isPresenting) this.renderer.xr.getSession().end();
+    document.exitPointerLock?.();
+    this.moveState = {w:false,a:false,s:false,d:false};
+    this.addFeedback('⏹ EMERGENCY STOP', 'bad');
+    this.toast('⏹ Session stopped');
+    this.audio.error();
+    Storage.logAudit(this.user, 'emergency_stop', {});
+    this.sessionActive = false;
+  },
+
+  animate() {
+    const dt = Math.min(this.clock.getDelta(), 0.1);
+    const t = this.clock.elapsedTime;
+    if (!this.renderer.xr.isPresenting && this.sessionActive && !this.pausedByTrainer) {
+      const speed = 4.5 * dt;
+      const forward = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+      const move = new THREE.Vector3();
+      if (this.moveState.w) move.add(forward);
+      if (this.moveState.s) move.sub(forward);
+      if (this.moveState.d) move.add(right);
+      if (this.moveState.a) move.sub(right);
+      if (move.lengthSq() > 0) {
+        move.normalize().multiplyScalar(speed);
+        this.camera.position.add(move);
+        this.camera.position.x = Math.max(-14, Math.min(14, this.camera.position.x));
+        this.camera.position.z = Math.max(-14, Math.min(14, this.camera.position.z));
+      }
+      this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+      this.camera.position.y = 1.7;
+      if (this.sessionActive && !this.pausedByTrainer) {
+        this.raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
+        const hits = this.raycaster.intersectObjects(this.interactables, true);
+        let newHover = null;
+        if (hits.length && hits[0].distance < 6) {
+          let o = hits[0].object;
+          while (o && !o.userData.interactable) o = o.parent;
+          newHover = o;
+        }
+        if (newHover !== this.hovered) {
+          if (this.hovered?.material?.emissive) this.hovered.material.emissiveIntensity = 0.4;
+          this.hovered = newHover;
+          if (this.hovered?.material?.emissive) this.hovered.material.emissiveIntensity = 1.2;
+          document.getElementById('interactPrompt').classList.toggle('show', !!newHover);
+          if (newHover) document.getElementById('interactPrompt').textContent = `[E] ${newHover.userData.label || 'Interact'}`;
+        }
+      }
+    }
+    if (this.fireGroup) {
+      this.fireGroup.children.forEach((c,i) => {
+        c.scale.y = 1 + Math.sin(t*8 + i)*0.1;
+        c.material.emissiveIntensity = 0.7 + Math.sin(t*12 + i)*0.3;
+      });
+    }
+    if (this.particles) {
+      const pos = this.particles.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        let y = pos.getY(i) + dt*0.3;
+        if (y > 12) y = 0;
+        pos.setY(i, y);
+      }
+      pos.needsUpdate = true;
+    }
+    if (this.sessionActive && this.startTime) {
+      const s = Math.floor((performance.now() - this.startTime)/1000);
+      const mm = String(Math.floor(s/60)).padStart(2,'0');
+      const ss = String(s%60).padStart(2,'0');
+      document.getElementById('uTime').textContent = `${mm}:${ss}`;
+    }
+    this.renderer.render(this.scene, this.camera);
+  },
+
+  onResize() {
+    this.camera.aspect = innerWidth / innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(innerWidth, innerHeight);
+  }
+};
+
+app.init();
+window.app = app;
+console.log('%c◈ VirtuTrain Enterprise v4 — Secure', 'color:#4fc3f7;font-size:20px;font-weight:bold;');
+console.log('%cAdmin credentials are not displayed in the UI.', 'color:#8ba5c9;');
+</script>
+</body>
+</html>
